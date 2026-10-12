@@ -1,0 +1,53 @@
+
+name: Build AHP Hurma Mod
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'AHP-Hurma-1.21.11-cloud-build.zip'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository files
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Extract source archive
+        run: |
+          mkdir buildsrc
+          unzip AHP-Hurma-1.21.11-cloud-build.zip -d buildsrc
+
+      - name: Find project and build Fabric mod
+        run: |
+          WRAPPER="$(find buildsrc -type f -name gradlew | head -n 1)"
+          if [ -z "$WRAPPER" ]; then
+            echo "ERROR: gradlew was not found in the archive."
+            echo "Archive contents:"
+            find buildsrc -maxdepth 3 -type f | head -n 100
+            exit 1
+          fi
+          ROOT="$(dirname "$WRAPPER")"
+          echo "Project root: $ROOT"
+          cd "$ROOT"
+          chmod +x gradlew
+          ./gradlew :fabric:build --no-daemon
+
+      - name: Upload JAR and build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AHP-Hurma-build-results
+          path: |
+            buildsrc/**/build/libs/*.jar
+            buildsrc/**/build/reports/
+          if-no-files-found: warn
